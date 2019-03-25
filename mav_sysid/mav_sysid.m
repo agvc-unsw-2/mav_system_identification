@@ -1,18 +1,24 @@
 %% user set params
 
-bag_name = 'testBag.bag'; %'2019-03-23-14-04-15.bag';
-bag_name = '2019-03-23-14-04-15.bag';
-bag_name = '2019-03-23-16-01-20.bag';
-%bag_name = '2019-03-23-16-13-18.bag';
-bag_name = '2019-03-23-18-45-51.bag';
-imu_topic = '/mavros/imu/data';
-control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
+% bag_name = '2019-01-28-16-42-05.bag'
 
-% sys_id_start_time_s = 20;
+%bag_name = 'testBag.bag'; %'2019-03-23-14-04-15.bag';
+%bag_name = '2019-03-23-14-04-15.bag';
+%bag_name = '2019-03-23-16-01-20.bag';
+%bag_name = '2019-03-23-16-13-18.bag';
+bag_name = '2019-03-25-11-16-09.bag';
+% imu_topic = '/mavros/imu/data';
+% control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
+imu_topic = '/simulation/uav1/ground_truth/mavros/imu/data';
+control_topic = '/simulation/uav1/command/roll_pitch_yawrate_thrust';
+
+sys_id_start_time_s = 20;
 sys_id_end_time_s = 80;
 
 % parameters that must be provided 
-system_mass_kg = 1.0;
+% system_mass_kg = 1.95;
+system_mass_kg = 1.65;
+
 linear_drag_coefficients = [0.01, 0.01, 0]; %default values work for most systems
 yaw_gain = 1.0; %default value works for most systems
 yaw_damping = 0.95; %default value works for most systems
