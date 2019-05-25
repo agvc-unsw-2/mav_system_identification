@@ -1,23 +1,38 @@
 %% user set params
 
-% bag_name = '2019-01-28-16-42-05.bag'
+%bag_name = '2019-03-23-18-45-51.bag'
 
 %bag_name = 'testBag.bag'; %'2019-03-23-14-04-15.bag';
 %bag_name = '2019-03-23-14-04-15.bag';
 %bag_name = '2019-03-23-16-01-20.bag';
 %bag_name = '2019-03-23-16-13-18.bag';
-bag_name = '2019-03-25-11-16-09.bag';
-% imu_topic = '/mavros/imu/data';
-% control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
-imu_topic = '/simulation/uav1/ground_truth/mavros/imu/data';
-control_topic = '/simulation/uav1/command/roll_pitch_yawrate_thrust';
+%bag_name = '2019-03-25-11-16-09.bag';
 
-sys_id_start_time_s = 20;
-sys_id_end_time_s = 80;
+%bag_name = 'vrep_hex.bag';
+% bag_name = 'iris.bag';
+
+bag_name = 'vrep_quad_fast.bag';
+%% ACTUAL DRONE
+%imu_topic = '/mavros/imu/data';
+%control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
+%% SIMULATION
+
+%imu_topic = '/simulation/uav1/ground_truth/mavros/imu/data';
+%control_topic = '/simulation/uav1/command/roll_pitch_yawrate_thrust';
+
+imu_topic = '/vrep_quad1/ground_truth/mavros/imu/data';
+control_topic = '/vrep_quad1/command/roll_pitch_yawrate_thrust';
+
+%imu_topic = '/vrep_hex1/ground_truth/mavros/imu/data';
+%control_topic = '/vrep_hex1/command/roll_pitch_yawrate_thrust';
+
+sys_id_start_time_s = 10;
+sys_id_end_time_s = 70;
 
 % parameters that must be provided 
 % system_mass_kg = 1.95;
-system_mass_kg = 1.65;
+% system_mass_kg = 1.65; % vrep_hex
+system_mass_kg = 1.45; % vrep_quad
 
 linear_drag_coefficients = [0.01, 0.01, 0]; %default values work for most systems
 yaw_gain = 1.0; %default value works for most systems
@@ -41,12 +56,30 @@ attitude_cmd = readCommandRollPitchYawRateThrust(bag, control_topic);
 imu_data.rpy = quat2rpy([imu_data.q(4,:)', imu_data.q(1:3,:)']');
 attitude_cmd.rpy = vertcat(attitude_cmd.roll, attitude_cmd.pitch, attitude_cmd.yaw_rate);
 
-
 t_start = imu_data.t(1);% + .6;
 % t_start = 0
 imu_data.t = imu_data.t - t_start;
 attitude_cmd.t = attitude_cmd.t - t_start 
 %attitude_cmd.t = attitude_cmd.t - attitude_cmd.t(1);
+
+[~, duplicates_i] = unique(attitude_cmd.t);
+attitude_cmd.t = attitude_cmd.t(duplicates_i);
+attitude_cmd.i = attitude_cmd.i(duplicates_i);
+attitude_cmd.roll = attitude_cmd.roll(duplicates_i);
+attitude_cmd.pitch = attitude_cmd.pitch(duplicates_i);
+attitude_cmd.yaw_rate = attitude_cmd.yaw_rate(duplicates_i);
+attitude_cmd.thrust = attitude_cmd.thrust(:,duplicates_i);
+attitude_cmd.rpy = attitude_cmd.rpy(:,duplicates_i);
+%attitude_cmd.thrust = attitude_cmd.thrust(duplicates_i);
+%attitude.t(duplicates_i) = [];
+%attitude.i(duplicates_i) = [];
+%attitude.roll(duplicates_i) = [];
+%attitude.pitch(duplicates_i) = [];
+%attitude.yaw_rate(duplicates_i) = [];
+%attitude.thrust(duplicates_i) = [];
+%attitude.rpy(duplicates_i) = [];
+%attitude.rpy_interp(duplicates_i) = [];
+
 %% plot
 figure(1);
 ax = axes;
