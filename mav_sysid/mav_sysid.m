@@ -11,28 +11,31 @@
 %bag_name = 'vrep_hex.bag';
 % bag_name = 'iris.bag';
 
-bag_name = 'vrep_quad_fast.bag';
+%bag_name = 'vrep_hex_500.bag';
+bag_name = 'aero1_new.bag';
+%bag_name = 'nuc2.bag';
+%bag_name = 'vrep_quad_new_loads_800_new_pq_90.bag';
+sys_id_start_time_s = 30.0;
+sys_id_end_time_s = 90.0;
+delay = 0.0;
 %% ACTUAL DRONE
-%imu_topic = '/mavros/imu/data';
-%control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
+imu_topic = '/mavros/imu/data';
+control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
 %% SIMULATION
 
-%imu_topic = '/simulation/uav1/ground_truth/mavros/imu/data';
-%control_topic = '/simulation/uav1/command/roll_pitch_yawrate_thrust';
-
-imu_topic = '/vrep_quad1/ground_truth/mavros/imu/data';
-control_topic = '/vrep_quad1/command/roll_pitch_yawrate_thrust';
+%imu_topic = '/vrep_quad1/ground_truth/mavros/imu/data';
+%control_topic = '/vrep_quad1/command/roll_pitch_yawrate_thrust';
 
 %imu_topic = '/vrep_hex1/ground_truth/mavros/imu/data';
 %control_topic = '/vrep_hex1/command/roll_pitch_yawrate_thrust';
 
-sys_id_start_time_s = 10;
-sys_id_end_time_s = 70;
 
 % parameters that must be provided 
 % system_mass_kg = 1.95;
 % system_mass_kg = 1.65; % vrep_hex
-system_mass_kg = 1.45; % vrep_quad
+
+%% Parameters
+system_mass_kg = 1.0;
 
 linear_drag_coefficients = [0.01, 0.01, 0]; %default values work for most systems
 yaw_gain = 1.0; %default value works for most systems
@@ -59,7 +62,10 @@ attitude_cmd.rpy = vertcat(attitude_cmd.roll, attitude_cmd.pitch, attitude_cmd.y
 t_start = imu_data.t(1);% + .6;
 % t_start = 0
 imu_data.t = imu_data.t - t_start;
-attitude_cmd.t = attitude_cmd.t - t_start 
+
+% 0.05 for aero, 0.10 for f550
+attitude_cmd.t = attitude_cmd.t - t_start + delay;
+
 %attitude_cmd.t = attitude_cmd.t - attitude_cmd.t(1);
 
 [~, duplicates_i] = unique(attitude_cmd.t);
@@ -117,7 +123,7 @@ legend('Acceleration', 'Commanded thrust');
 grid on;
 ax.FontSize = 16;
 
-%% sysid
+%% interpolate to match timestamps
 %imu_data.t = imu_data.t + 0.6;
 attitude_cmd.rpy_interp = zeros(size(imu_data.rpy));
 attitude_cmd.rpy_interp(1,:) = interp1(attitude_cmd.t, attitude_cmd.rpy(1,:), imu_data.t);
@@ -129,31 +135,34 @@ attitude_cmd.thrust_interp = interp1(attitude_cmd.t, attitude_cmd.thrust(3,:), i
 
 attitude_cmd.t = imu_data.t;
 
-imu_data.t = imu_data.t(imu_data.t > sys_id_start_time_s& imu_data.t < sys_id_end_time_s);
-imu_data.rpy = imu_data.rpy(:, imu_data.t > sys_id_start_time_s & imu_data.t < sys_id_end_time_s);
-imu_data.a = imu_data.a(:, imu_data.t > sys_id_start_time_s & imu_data.t < sys_id_end_time_s);
+%% get specified time period
+imu_data_old = imu_data.t;
+imu_data.t = imu_data.t(imu_data.t > sys_id_start_time_s & imu_data.t < sys_id_end_time_s);
+%imu_data.t = imu_data.t - sys_id_start_time_s;
+imu_data.rpy = imu_data.rpy(:, imu_data_old > sys_id_start_time_s & imu_data_old < sys_id_end_time_s);
+imu_data.a = imu_data.a(:, imu_data_old > sys_id_start_time_s & imu_data_old < sys_id_end_time_s);
 
-attitude_cmd.t = attitude_cmd.t(attitude_cmd.t > sys_id_start_time_s & attitude_cmd.t < sys_id_end_time_s);
-attitude_cmd.rpy_interp = attitude_cmd.rpy_interp(:, attitude_cmd.t > sys_id_start_time_s & attitude_cmd.t < sys_id_end_time_s);
-attitude_cmd.thrust_interp = attitude_cmd.thrust_interp(:, attitude_cmd.t > sys_id_start_time_s & attitude_cmd.t < sys_id_end_time_s);
+attitude_cmd.t = attitude_cmd.t(imu_data_old > sys_id_start_time_s & imu_data_old < sys_id_end_time_s);
+%attitude_cmd.t = imu_data.t - sys_id_start_time_s;
+attitude_cmd.rpy_interp = attitude_cmd.rpy_interp(:, imu_data_old > sys_id_start_time_s & imu_data_old < sys_id_end_time_s);
+attitude_cmd.thrust_interp = attitude_cmd.thrust_interp(:, imu_data_old > sys_id_start_time_s & imu_data_old < sys_id_end_time_s);
 
+%% get roll and pitch data
 dt = mean(diff(imu_data.t));
 idx = find(isnan(attitude_cmd.rpy_interp(1,:)));
 roll_data = iddata(imu_data.rpy(1,:)', attitude_cmd.rpy_interp(1,:)', dt);
 pitch_data = iddata(imu_data.rpy(2,:)', attitude_cmd.rpy_interp(2,:)', dt);
 
-roll_data = iddata(imu_data.rpy(1,idx(end)+1:end)', attitude_cmd.rpy_interp(1,idx(end)+1:end)', dt);
-pitch_data = iddata(imu_data.rpy(2,idx(end)+1:end)', attitude_cmd.rpy_interp(2,idx(end)+1:end)', dt);
-
-
+%roll_data = iddata(imu_data.rpy(1,idx(end)+1:end)', attitude_cmd.rpy_interp(1,idx(end)+1:end)', dt);
+%pitch_data = iddata(imu_data.rpy(2,idx(end)+1:end)', attitude_cmd.rpy_interp(2,idx(end)+1:end)', dt);
 
 roll_tf = tfest( roll_data, 1, 0);
 pitch_tf = tfest( pitch_data, 1, 0);
 
 disp('=====================================================================');
 disp('1st order dynamics'); 
-fprintf('pitch fit percentage: %f%%\n', pitch_tf.Report.Fit.FitPercent);
 fprintf('roll fit percentage: %f%%\n\n', roll_tf.Report.Fit.FitPercent);
+fprintf('pitch fit percentage: %f%%\n', pitch_tf.Report.Fit.FitPercent);
 disp('---------------------------------------------------------------------');
 disp('Copy the following into your nonlinear_mpc.yaml file')
 disp('---------------------------------------------------------------------');
@@ -176,8 +185,8 @@ pitch_tf = tfest( pitch_data, 2, 0);
 
 disp('=====================================================================');
 disp('2nd order dynamics'); 
-fprintf('pitch fit percentage: %f%%\n', pitch_tf.Report.Fit.FitPercent);
 fprintf('roll fit percentage: %f%%\n\n', roll_tf.Report.Fit.FitPercent);
+fprintf('pitch fit percentage: %f%%\n', pitch_tf.Report.Fit.FitPercent);
 disp('---------------------------------------------------------------------');
 disp('Copy the following into your disturbance_observer.yaml file');
 disp('---------------------------------------------------------------------');
@@ -211,4 +220,38 @@ fprintf('  yaw_rate_scaling_factor: %f\n', yaw_gain);
 disp('---------------------------------------------------------------------');
 
 
-%% 
+%% plot input and actual
+figure();
+ax = axes;
+plot(roll_data);
+xlabel('time (s)');
+ylabel('roll (rad)');
+title('roll angle');
+grid on;
+ax.FontSize = 16;
+
+figure();
+ax = axes;
+plot(pitch_data);
+xlabel('time (s)');
+ylabel('pitch (rad)');
+title('pitch angle');
+grid on;
+ax.FontSize = 16;
+
+%% Plot against simulated output
+time_to_plot_start = 5;
+time_to_plot_end = 30;
+start_elem = floor(time_to_plot_start / dt) + 1;
+end_elem = floor(time_to_plot_end / dt) + 1;
+t_sim = 0:dt:ceil(length(roll_data.u)*dt);
+t_sim = t_sim(1:length(roll_data.u));
+roll_sim = sim(roll_tf, roll_data.u);
+pitch_sim = sim(pitch_tf, pitch_data.u);
+figure(); hold on;
+plot(t_sim(start_elem:end_elem), roll_data.y(start_elem:end_elem), 'linewidth', 2);
+plot(t_sim(start_elem:end_elem), roll_sim(start_elem:end_elem), '--r', 'linewidth', 2);
+legend('roll', 'simulated roll');
+xlabel('time (s)');
+ylabel('roll (rad)');
+xlim([time_to_plot_start, time_to_plot_end]);
