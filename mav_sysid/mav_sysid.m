@@ -12,23 +12,27 @@
 % bag_name = 'iris.bag';
 
 %bag_name = 'vrep_hex_500.bag';
-bag_name = 'aero1_new.bag';
+%bag_name = 'aero1_new.bag';
 %bag_name = 'nuc2.bag';
-%bag_name = 'vrep_quad_new_loads_800_new_pq_90.bag';
-sys_id_start_time_s = 30.0;
-sys_id_end_time_s = 90.0;
+bag_name = 'vrep_quad_new_loads_800_new_pq_90.bag';
+sys_id_start_time_s = 20.0;
+sys_id_end_time_s = 60.0;
 delay = 0.0;
-%% ACTUAL DRONE
-imu_topic = '/mavros/imu/data';
-control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
-%% SIMULATION
 
-%imu_topic = '/vrep_quad1/ground_truth/mavros/imu/data';
-%control_topic = '/vrep_quad1/command/roll_pitch_yawrate_thrust';
-
-%imu_topic = '/vrep_hex1/ground_truth/mavros/imu/data';
-%control_topic = '/vrep_hex1/command/roll_pitch_yawrate_thrust';
-
+if(length(strfind(bag_name,'vrep')) > 0)
+    % SIMULATION
+    if(length(strfind(bag_name,'quad')) > 0)
+        imu_topic = '/vrep_quad1/ground_truth/mavros/imu/data';
+        control_topic = '/vrep_quad1/command/roll_pitch_yawrate_thrust';
+    elseif(length(strfind(bag_name,'hex')) > 0)
+        imu_topic = '/vrep_hex1/ground_truth/mavros/imu/data';
+        control_topic = '/vrep_hex1/command/roll_pitch_yawrate_thrust';
+    end
+else
+    % ACTUAL DRONE
+    imu_topic = '/mavros/imu/data';
+    control_topic = '/mavros/setpoint_raw/roll_pitch_yawrate_thrust';
+end
 
 % parameters that must be provided 
 % system_mass_kg = 1.95;
@@ -156,6 +160,7 @@ pitch_data = iddata(imu_data.rpy(2,:)', attitude_cmd.rpy_interp(2,:)', dt);
 %roll_data = iddata(imu_data.rpy(1,idx(end)+1:end)', attitude_cmd.rpy_interp(1,idx(end)+1:end)', dt);
 %pitch_data = iddata(imu_data.rpy(2,idx(end)+1:end)', attitude_cmd.rpy_interp(2,idx(end)+1:end)', dt);
 
+%% Get 1st order models
 roll_tf = tfest( roll_data, 1, 0);
 pitch_tf = tfest( pitch_data, 1, 0);
 
@@ -175,6 +180,9 @@ fprintf('pitch_gain: %f\n', dcgain(pitch_tf));
 fprintf('linear_drag_coefficients: [%f, %f, %f]\n', linear_drag_coefficients(1),linear_drag_coefficients(2),linear_drag_coefficients(3));
 fprintf('yaw_gain: %f\n', yaw_gain);
 disp('---------------------------------------------------------------------');
+
+roll_tf_first_order = roll_tf;
+pitch_tf_first_order = pitch_tf;
 
 %2nd order
 roll_tf = tfest( roll_data, 2, 0);
@@ -219,6 +227,8 @@ fprintf('  system_mass_kg: %f\n', system_mass_kg);
 fprintf('  yaw_rate_scaling_factor: %f\n', yaw_gain);
 disp('---------------------------------------------------------------------');
 
+roll_tf_second_order = roll_tf;
+pitch_tf_second_order = pitch_tf;
 
 %% plot input and actual
 figure();
@@ -239,19 +249,58 @@ title('pitch angle');
 grid on;
 ax.FontSize = 16;
 
-%% Plot against simulated output
+%% Setup simulated output time
 time_to_plot_start = 5;
 time_to_plot_end = 30;
 start_elem = floor(time_to_plot_start / dt) + 1;
 end_elem = floor(time_to_plot_end / dt) + 1;
 t_sim = 0:dt:ceil(length(roll_data.u)*dt);
 t_sim = t_sim(1:length(roll_data.u));
-roll_sim = sim(roll_tf, roll_data.u);
-pitch_sim = sim(pitch_tf, pitch_data.u);
+
+%% Plot simulated roll (1st order)
+roll_sim = sim(roll_tf_first_order, roll_data.u);
 figure(); hold on;
 plot(t_sim(start_elem:end_elem), roll_data.y(start_elem:end_elem), 'linewidth', 2);
 plot(t_sim(start_elem:end_elem), roll_sim(start_elem:end_elem), '--r', 'linewidth', 2);
 legend('roll', 'simulated roll');
 xlabel('time (s)');
 ylabel('roll (rad)');
+title('Modelled roll and actual roll (1st order model)')
 xlim([time_to_plot_start, time_to_plot_end]);
+ylim([min(roll_data.y(start_elem:end_elem)) - 0.25, max(roll_data.y(start_elem:end_elem)) + 0.25]);
+
+%% Plot simulated pitch (1st order)
+pitch_sim = sim(pitch_tf_first_order, pitch_data.u);
+figure(); hold on;
+plot(t_sim(start_elem:end_elem), pitch_data.y(start_elem:end_elem), 'linewidth', 2);
+plot(t_sim(start_elem:end_elem), pitch_sim(start_elem:end_elem), '--r', 'linewidth', 2);
+legend('pitch', 'simulated roll');
+xlabel('time (s)');
+ylabel('roll (rad)');
+title('Modelled pitch and actual pitch (1st order model)')
+xlim([time_to_plot_start, time_to_plot_end]);
+ylim([min(pitch_data.y(start_elem:end_elem)) - 0.25, max(pitch_data.y(start_elem:end_elem)) + 0.25]);
+
+%% Plot simulated roll (2nd order)
+roll_sim = sim(roll_tf_second_order, roll_data.u);
+figure(); hold on;
+plot(t_sim(start_elem:end_elem), roll_data.y(start_elem:end_elem), 'linewidth', 2);
+plot(t_sim(start_elem:end_elem), roll_sim(start_elem:end_elem), '--r', 'linewidth', 2);
+legend('roll', 'simulated roll');
+xlabel('time (s)');
+ylabel('roll (rad)');
+title('Modelled roll and actual roll (2nd order model)')
+xlim([time_to_plot_start, time_to_plot_end]);
+ylim([min(roll_data.y(start_elem:end_elem)) - 0.25, max(roll_data.y(start_elem:end_elem)) + 0.25]);
+
+%% Plot simulated pitch (2nd order)
+pitch_sim = sim(pitch_tf_second_order, pitch_data.u);
+figure(); hold on;
+plot(t_sim(start_elem:end_elem), pitch_data.y(start_elem:end_elem), 'linewidth', 2);
+plot(t_sim(start_elem:end_elem), pitch_sim(start_elem:end_elem), '--r', 'linewidth', 2);
+legend('pitch', 'simulated roll');
+xlabel('time (s)');
+ylabel('roll (rad)');
+title('Modelled pitch and actual pitch (2nd order model)')
+xlim([time_to_plot_start, time_to_plot_end]);
+ylim([min(pitch_data.y(start_elem:end_elem)) - 0.25, max(pitch_data.y(start_elem:end_elem)) + 0.25]);
